@@ -73,10 +73,10 @@ jobs:
           tr '\r' '\n' < unit_raw.log | sed -e 's/\x1b\[[0-9;]*m//g' > unit.log
           if [ "$status" -ne 0 ]; then
             echo "::error::flutter test exit=$status bytes=$(wc -c <unit.log) lines=$(wc -l <unit.log)"
-            grep -aE '\[E\]|Expected:|Actual:|Which:|Error:|Failed to load' unit.log \
-              | head -10 | cut -c1-300 | sed -e 's/%/%25/g' \
-              | while IFS= read -r line; do echo "::error::HIT | ${line}"; done
-            tail -20 unit.log | cut -c1-300 | sed -e 's/%/%25/g' \
+            grep -aB14 -m1 'Expected:' unit.log | cut -c1-300 | sed -e 's/%/%25/g' \
+              | while IFS= read -r line; do echo "::error::FAIL | ${line}"; done
+            echo "::error::SUM | $(grep -acE '✅' unit.log) passed / $(grep -acE '❌|Unhandled' unit.log) bad / last: $(grep -aE '✅|❌' unit.log | tail -1 | cut -c1-160)"
+            tail -25 unit.log | cut -c1-300 | sed -e 's/%/%25/g' \
               | while IFS= read -r line; do echo "::error::OUT | ${line}"; done
           fi
           exit $status
