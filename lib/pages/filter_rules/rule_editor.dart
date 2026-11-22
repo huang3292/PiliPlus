@@ -314,8 +314,11 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
     child: Text(text, style: const TextStyle(fontSize: 13)),
   );
 
-  Widget _note(String text, Color color) => Padding(
+  Widget _note(String text, [Color? color]) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: Text(text, style: TextStyle(fontSize: 13, color: color)),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 13, color: color ?? Colors.grey),
+    ),
   );
 }

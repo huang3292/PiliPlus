@@ -56,7 +56,7 @@ enum FilterMatch {
   bool get isNumeric => this == lessThan || this == atLeast || this == equals;
 }
 
-T? _parse<T>(List<T> values, Object? name) {
+T? _parse<T extends Enum>(List<T> values, Object? name) {
   if (name is! String) return null;
   for (final value in values) {
     if (value.name == name) return value;

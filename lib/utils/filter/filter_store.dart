@@ -101,7 +101,12 @@ abstract final class FilterStore {
   }
 
   static Future<void> _migrateLegacy() async {
-    if (GStorage.setting.getBool(SettingBoxKey.filterRulesMigrated)) return;
+    if (GStorage.setting.get(
+      SettingBoxKey.filterRulesMigrated,
+      defaultValue: false,
+    )) {
+      return;
+    }
 
     final stored = GStorage.setting.get(
       SettingBoxKey.filterRules,
