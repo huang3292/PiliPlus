@@ -7,6 +7,9 @@ import 'package:PiliPlus/models/model_avatar.dart';
 import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/watched_show.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
+import 'package:PiliPlus/utils/filter/filter_engine.dart';
+import 'package:PiliPlus/utils/filter/filter_rule.dart';
+import 'package:PiliPlus/utils/filter/filter_store.dart';
 import 'package:PiliPlus/utils/parse_bool.dart';
 import 'package:PiliPlus/utils/parse_int.dart';
 import 'package:PiliPlus/utils/parse_string.dart';
@@ -47,6 +50,20 @@ class DynamicsDataModel {
 
   static bool antiGoodsDyn = Pref.antiGoodsDyn;
 
+  /// 自定义规则里的「动态」条件：列表数据只有作者和正文可比对。
+  static bool _blockedByRules(DynamicItemModel item) {
+    if (!FilterStore.engine.hasActiveRules) return false;
+    final author = item.modules.moduleAuthor;
+    return FilterStore.blocked(
+      FilterTarget.dyn,
+      FilterSubject(
+        uid: author?.mid,
+        nickname: author?.name,
+        content: _getMatchText(item),
+      ),
+    );
+  }
+
   DynamicsDataModel.fromJson(
     Map<String, dynamic> json, {
     DynamicsTabType type = DynamicsTabType.all,
@@ -77,6 +94,9 @@ class DynamicsDataModel {
           if (banWordForDyn.hasMatch(_getMatchText(item))) {
             continue;
           }
+        }
+        if (_blockedByRules(item)) {
+          continue;
         }
         if (filterBan &&
             tempBannedList!.contains(item.modules.moduleAuthor?.mid)) {

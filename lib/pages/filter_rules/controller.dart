@@ -4,12 +4,11 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
 /// 规则页管理的范围。弹幕走 B 站服务端的屏蔽规则（uid 还是哈希过的），
-/// 不在这个列表里，以后单独设计。
+/// 不在这个列表里，以后单独设计；搜索结果暂时没有接入判定。
 const List<FilterTarget> kFilterScopes = [
   FilterTarget.reply,
   FilterTarget.video,
   FilterTarget.dyn,
-  FilterTarget.search,
 ];
 
 class FilterRulesController extends GetxController {
