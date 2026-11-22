@@ -204,6 +204,7 @@ abstract final class VideoHttp {
   static bool _filterHotAndRank(dynamic i) {
     if (GlobalData().blackMids.contains(i['owner']['mid'])) return false;
     if (RecommendFilter.filterTitle(i['title'])) return false;
+    if (RecommendFilter.blockedFromJson(i)) return false;
     if (RecommendFilter.filterLikeRatio(i['stat']['like'], i['stat']['view'])) {
       return false;
     }

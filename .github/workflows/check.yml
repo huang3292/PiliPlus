@@ -46,12 +46,11 @@ jobs:
           status=$?
           sed -e 's/\x1b\[[0-9;]*m//g' analyze_raw.log > analyze.log
           grep -aE '(^|  )(error|warning)( • | - )' analyze.log \
-            | head -40 \
-            | sed -e 's/%/%25/g' \
+            | head -40 | cut -c1-500 | sed -e 's/%/%25/g' \
             | while IFS= read -r line; do echo "::error::${line}"; done
           if [ "$status" -ne 0 ] && ! grep -qaE '(^|  )(error|warning)( • | - )' analyze.log; then
             echo "::error::analyze exited $status without parseable findings, tail below"
-            tail -25 analyze.log | sed -e 's/%/%25/g' | while IFS= read -r line; do
+            tail -25 analyze.log | cut -c1-500 | sed -e 's/%/%25/g' | while IFS= read -r line; do
               echo "::error::${line}"
             done
           fi
@@ -62,11 +61,11 @@ jobs:
           set +e
           flutter test test/utils/filter > unit_raw.log 2>&1
           status=$?
-          sed -e 's/\x1b\[[0-9;]*m//g' unit_raw.log > unit.log
+          # 进度输出靠 \r 分隔，不换成换行符的话整段会算作一行，注解会被 GitHub 丢掉。
+          tr '\r' '\n' < unit_raw.log | sed -e 's/\x1b\[[0-9;]*m//g' > unit.log
           if [ "$status" -ne 0 ]; then
-            grep -aE '\[E\]|Expected: |Actual: |Failed to load|Exception|Some tests failed' unit.log \
-              | head -30 \
-              | sed -e 's/%/%25/g' \
+            grep -aE '\[E\]|Expected:|Actual:|Which:|Error:|Failed to load|Some tests failed' unit.log \
+              | tail -25 | cut -c1-500 | sed -e 's/%/%25/g' \
               | while IFS= read -r line; do echo "::error::${line}"; done
           fi
           exit $status
@@ -78,11 +77,10 @@ jobs:
           set +e
           flutter test > full_raw.log 2>&1
           status=$?
-          sed -e 's/\x1b\[[0-9;]*m//g' full_raw.log > full.log
+          tr '\r' '\n' < full_raw.log | sed -e 's/\x1b\[[0-9;]*m//g' > full.log
           if [ "$status" -ne 0 ]; then
-            grep -aE '\[E\]|Expected: |Actual: |Failed to load|Some tests failed' full.log \
-              | head -30 \
-              | sed -e 's/%/%25/g' \
+            grep -aE '\[E\]|Error:|Failed to load|Some tests failed' full.log \
+              | tail -20 | cut -c1-500 | sed -e 's/%/%25/g' \
               | while IFS= read -r line; do echo "::warning::${line}"; done
           fi
           exit 0

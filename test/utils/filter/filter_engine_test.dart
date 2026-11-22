@@ -126,12 +126,12 @@ void main() {
       expect(
         engine([rule(FilterField.uidLength, FilterMatch.lessThan, '6')])
             .match(FilterTarget.reply, author).isBlocked,
-        isFalse,
+        isTrue,
       );
       expect(
         engine([rule(FilterField.uidLength, FilterMatch.atLeast, '6')])
             .match(FilterTarget.reply, author).isBlocked,
-        isTrue,
+        isFalse,
       );
     });
 
@@ -308,7 +308,7 @@ void main() {
       );
       expect(
         rule(FilterField.content, FilterMatch.regex, r'试.*').summary,
-        '正文 正则 /试.*/',
+        '正文 正则表达式 /试.*/',
       );
       expect(
         rule(FilterField.official, FilterMatch.equals, '2').summary,

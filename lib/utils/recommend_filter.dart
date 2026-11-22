@@ -54,6 +54,22 @@ abstract final class RecommendFilter {
         _blockedByRules(videoItem);
   }
 
+  /// 热门/排行此时还是原始 json，只能自己从 map 里取 up 主。
+  static bool blockedFromJson(Map video) {
+    if (!FilterStore.engine.hasActiveRules) return false;
+    final owner = video['owner'];
+    final mid = owner is Map ? owner['mid'] : null;
+    final name = owner is Map ? owner['name'] : null;
+    return FilterStore.blocked(
+      FilterTarget.video,
+      FilterSubject(
+        uid: mid is int ? mid : null,
+        nickname: name is String ? name : null,
+        content: video['title'] is String ? video['title'] : null,
+      ),
+    );
+  }
+
   /// 自定义规则里的「视频」条件；列表项只有 up 主和标题可用来比对。
   static bool _blockedByRules(BaseVideoItemModel videoItem) {
     if (!FilterStore.engine.hasActiveRules) return false;
