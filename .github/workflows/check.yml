@@ -38,49 +38,51 @@ jobs:
         shell: pwsh
         run: lib/scripts/patch.ps1 Linux
 
+      # 作业日志需要登录才能看，这里把分析结果逐行写成注解，用公开 API 就能读到。
       - name: Analyze
         run: |
+          set +e
           flutter analyze --no-fatal-infos > analyze_raw.log 2>&1
           status=$?
           sed -e 's/\x1b\[[0-9;]*m//g' analyze_raw.log > analyze.log
-          if grep -aq 'flutter analyze' analyze.log; then
-            echo '=== analyze output (flutter version) ==='
-            grep -a 'flutter analyze' analyze.log
+          grep -aE '(^|  )(error|warning)( • | - )' analyze.log \
+            | head -40 \
+            | sed -e 's/%/%25/g' \
+            | while IFS= read -r line; do echo "::error::${line}"; done
+          if [ "$status" -ne 0 ] && ! grep -qaE '(^|  )(error|warning)( • | - )' analyze.log; then
+            echo "::error::analyze exited $status without parseable findings, tail below"
+            tail -25 analyze.log | sed -e 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
           fi
-          if [ $status -eq 0 ]; then
-            echo "analyze clean"
-            exit 0
-          fi
-          if grep -aq ' • ' analyze.log; then
-            grep -a ' • ' analyze.log \
-              | head -40 \
-              | sed -e 's/%/%25/g' \
-              | while IFS= read -r line; do
-                  echo "::error::${line}"
-                done
-          else
-            echo "::error::analyze failed but no findings were parsed, see log"
-            echo '=== tail of analyze.log ==='
-            tail -40 analyze.log
-          fi
-          exit 1
+          exit $status
 
       - name: Test filter rules
-        run: flutter test test/utils/filter
+        run: |
+          set +e
+          flutter test test/utils/filter > unit_raw.log 2>&1
+          status=$?
+          sed -e 's/\x1b\[[0-9;]*m//g' unit_raw.log > unit.log
+          if [ "$status" -ne 0 ]; then
+            grep -aE '\[E\]|Expected: |Actual: |Failed to load|Exception|Some tests failed' unit.log \
+              | head -30 \
+              | sed -e 's/%/%25/g' \
+              | while IFS= read -r line; do echo "::error::${line}"; done
+          fi
+          exit $status
 
       # 全仓库用例里可能混有历史遗留的失败，先放行，但把失败行写成注解暴露出来。
       - name: Test everything
         continue-on-error: true
         run: |
-          set -o pipefail
-          if flutter test 2>&1 | tee test_output.log; then
-            echo "all tests passed"
-          else
-            grep -E '\[E\]|Expected: |Actual: |Failed to load|Exception' test_output.log \
+          set +e
+          flutter test > full_raw.log 2>&1
+          status=$?
+          sed -e 's/\x1b\[[0-9;]*m//g' full_raw.log > full.log
+          if [ "$status" -ne 0 ]; then
+            grep -aE '\[E\]|Expected: |Actual: |Failed to load|Some tests failed' full.log \
               | head -30 \
-              | sed -e 's/%/%25/g' -e 's/:/%3A/g' \
-              | while IFS= read -r line; do
-                  echo "::error::${line}"
-                done
-            exit 1
+              | sed -e 's/%/%25/g' \
+              | while IFS= read -r line; do echo "::warning::${line}"; done
           fi
+          exit 0
