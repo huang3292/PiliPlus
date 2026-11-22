@@ -1,0 +1,49 @@
+name: Dev APK
+
+# 只给「装到手机上试」用：release 优化、debug 签名，不需要上游的发布密钥。
+# 手动触发，产物在运行页面的 Artifacts 里下载。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Android test apk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+          cache-dependency-path: |
+            android/*.gradle*
+            android/**/gradle-wrapper.properties
+
+      - name: Setup flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Apply Patch
+        shell: pwsh
+        run: lib/scripts/patch.ps1 android
+
+      - name: Build
+        run: flutter build apk --release --split-per-abi --android-project-arg dev=1 --no-pub
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: PiliPlus-test-apk
+          path: build/app/outputs/flutter-apk/app-*-release.apk
+          if-no-files-found: error
