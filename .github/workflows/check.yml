@@ -38,7 +38,19 @@ jobs:
         run: lib/scripts/patch.ps1 Linux
 
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: |
+          set -o pipefail
+          if flutter analyze --no-fatal-infos 2>&1 | tee analyze_output.log; then
+            echo "analyze clean"
+          else
+            grep -E "^ *error|^ *warning" analyze_output.log \
+              | head -30 \
+              | sed -e 's/%/%25/g' -e 's/:/%3A/g' \
+              | while IFS= read -r line; do
+                  echo "::error::${line}"
+                done
+            exit 1
+          fi
 
       - name: Test filter rules
         run: flutter test test/utils/filter

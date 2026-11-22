@@ -4,6 +4,9 @@ import 'package:PiliPlus/grpc/bilibili/pagination.pb.dart';
 import 'package:PiliPlus/grpc/grpc_req.dart';
 import 'package:PiliPlus/grpc/url.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/utils/filter/filter_engine.dart';
+import 'package:PiliPlus/utils/filter/filter_rule.dart';
+import 'package:PiliPlus/utils/filter/filter_store.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:fixnum/fixnum.dart';
@@ -96,12 +99,30 @@ abstract final class ReplyGrpc {
         reply.content.atNameToMid.length >= blockReplyAtCount!;
   }
 
+  /// 用户自定义规则：等级/昵称/uid 等已在响应里，粉丝数缺失时不屏蔽。
+  static bool _blockedByRules(ReplyInfo reply) {
+    if (!FilterStore.engine.hasActiveRules) return false;
+    final member = reply.member;
+    return FilterStore.blocked(
+      FilterTarget.reply,
+      FilterSubject(
+        uid: reply.mid.toInt(),
+        nickname: member.name,
+        content: reply.content.message,
+        level: member.level.toInt(),
+        officialType: member.officialVerifyType.toInt(),
+        isVip: member.vipType > 0,
+      ),
+    );
+  }
+
   static bool needRemoveGrpc(ReplyInfo reply) {
     return GlobalData().blackMids.contains(reply.mid.toInt()) ||
         _blockReplyAtCount(reply) ||
         _blockAtOnlyReply(reply) ||
         (antiGoodsReply && _needRemoveGoodGrpc(reply)) ||
-        (enableFilter && replyRegExp.hasMatch(reply.content.message));
+        (enableFilter && replyRegExp.hasMatch(reply.content.message)) ||
+        _blockedByRules(reply);
   }
 
   static Future<LoadingState<MainListReply>> mainList({

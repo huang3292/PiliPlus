@@ -21,6 +21,7 @@ import 'package:PiliPlus/utils/desktop/calc_window_position.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/core_palettes_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
+import 'package:PiliPlus/utils/filter/filter_store.dart';
 import 'package:PiliPlus/utils/font_utils.dart';
 import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/json_file_handler.dart';
@@ -103,6 +104,7 @@ void main() async {
     DeviceUtils.exitApp();
   }
   ScaledWidgetsFlutterBinding.instance.scaleFactor = Pref.uiScale;
+  await FilterStore.load();
   await Future.wait([
     _initDownPath(),
     _initTmpPath(),

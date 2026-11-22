@@ -132,14 +132,23 @@ void main() {
 
   group('migrate', () {
     test('assigns each legacy scope to its own target', () {
-      final rules = LegacyBanWord.migrate({
-        FilterTarget.reply: '尝试|测试',
-        FilterTarget.video: '广告',
-      });
+      final rules = LegacyBanWord.migrate([
+        (FilterTarget.reply, '尝试|测试'),
+        (FilterTarget.video, '广告'),
+      ]);
       expect(rules, hasLength(3));
       expect(rules[0].targets, {FilterTarget.reply});
       expect(rules[2].targets, {FilterTarget.video});
       expect(rules.map((e) => e.id).toSet(), hasLength(3));
+    });
+
+    test('merges several legacy patterns into one target', () {
+      final rules = LegacyBanWord.migrate([
+        (FilterTarget.video, '推荐词'),
+        (FilterTarget.video, '分区词'),
+      ]);
+      expect(rules.map((e) => e.value), ['推荐词', '分区词']);
+      expect(rules.every((e) => e.targets == {FilterTarget.video}), isTrue);
     });
   });
 }

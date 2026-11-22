@@ -112,13 +112,14 @@ abstract final class LegacyBanWord {
     };
   }
 
-  /// 旧的四个作用域各自独立存串，迁移时按原作用域归属。
-  static List<FilterRule> migrate(Map<FilterTarget, String> legacy) {
+  /// 旧的每个作用域各存一条串，迁移后规则归属到对应作用域；
+  /// 一个作用域可能对应多条旧表达式（推荐流和分区共用视频类规则）。
+  static List<FilterRule> migrate(Iterable<(FilterTarget, String)> sources) {
     final rules = <FilterRule>[];
     var id = 1;
-    for (final entry in legacy.entries) {
-      for (final fragment in split(entry.value)) {
-        rules.add(toRule(fragment, {entry.key}, id++));
+    for (final (target, pattern) in sources) {
+      for (final fragment in split(pattern)) {
+        rules.add(toRule(fragment, {target}, id++));
       }
     }
     return rules;

@@ -136,6 +136,8 @@ abstract final class SettingBoxKey {
       pageTransition = 'pageTransition',
       optTabletNav = 'optTabletNav',
       banWordForDyn = 'banWordForDyn',
+      filterRules = 'filterRules',
+      filterRulesMigrated = 'filterRulesMigrated',
       enableLog = 'enableLog',
       memberTab = 'memberTab',
       dynamicDetailRatio = 'dynamicDetailRatio',

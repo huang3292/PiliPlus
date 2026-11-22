@@ -64,6 +64,9 @@ class FilterEngine {
 
   FilterEngine(this._config);
 
+  /// 没有任何启用规则时调用方可以完全跳过判定。
+  bool get hasActiveRules => _config.rules.any((rule) => rule.enabled);
+
   RegExp? _regExpFor(String source, bool caseSensitive) {
     final key = caseSensitive ? 'C$source' : 'i$source';
     if (_compiled.containsKey(key)) return _compiled[key];

@@ -109,7 +109,7 @@ class FilterRule {
             ?.map(FilterTarget.parse)
             .whereType<FilterTarget>()
             .toSet() ??
-        {};
+        <FilterTarget>{};
     if (targets.isEmpty) return null;
 
     final field = FilterField.parse(json['field']);
@@ -254,8 +254,8 @@ class FilterConfig {
   }
 
   /// 存储或导入的内容坏了就当没有规则，不能让屏蔽功能整体崩掉。
-  static FilterConfig tryDecode(String raw) {
-    if (raw.trim().isEmpty) return empty;
+  static FilterConfig tryDecode(Object? raw) {
+    if (raw is! String || raw.trim().isEmpty) return empty;
     try {
       final decoded = jsonDecode(raw);
       return decoded is Map ? fromJson(decoded) : empty;
