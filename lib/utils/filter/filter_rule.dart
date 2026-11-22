@@ -142,20 +142,28 @@ class FilterRule {
     return raw is String && raw.isNotEmpty ? raw : null;
   }
 
-  static bool _matchAllowed(FilterField field, FilterMatch match) {
-    if (field == FilterField.content || field == FilterField.nickname) {
-      return match == FilterMatch.contains ||
-          match == FilterMatch.equals ||
-          match == FilterMatch.startsWith ||
-          match == FilterMatch.endsWith ||
-          match == FilterMatch.regex;
-    }
-    if (field == FilterField.uid) {
-      return match == FilterMatch.equals || match == FilterMatch.regex;
-    }
-    return match == FilterMatch.lessThan ||
-        match == FilterMatch.atLeast ||
-        match == FilterMatch.equals;
+  static bool _matchAllowed(FilterField field, FilterMatch match) =>
+      allowedMatches(field).contains(match);
+
+  /// 界面上的「匹配方式」下拉框只列出这个字段能用的方式，
+  /// 用户不需要知道哪些组合是无意义的。
+  static List<FilterMatch> allowedMatches(FilterField field) {
+    return switch (field) {
+      FilterField.content || FilterField.nickname => const [
+        FilterMatch.contains,
+        FilterMatch.equals,
+        FilterMatch.startsWith,
+        FilterMatch.endsWith,
+        FilterMatch.regex,
+      ],
+      FilterField.uid => const [FilterMatch.equals, FilterMatch.regex],
+      FilterField.uidLength || FilterField.level || FilterField.fans || FilterField.following => const [
+        FilterMatch.lessThan,
+        FilterMatch.atLeast,
+        FilterMatch.equals,
+      ],
+      FilterField.official || FilterField.vip => const [FilterMatch.equals],
+    };
   }
 
   /// 设置页展示用的一行摘要。

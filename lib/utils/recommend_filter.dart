@@ -1,4 +1,7 @@
 import 'package:PiliPlus/models/model_video.dart';
+import 'package:PiliPlus/utils/filter/filter_engine.dart';
+import 'package:PiliPlus/utils/filter/filter_rule.dart';
+import 'package:PiliPlus/utils/filter/filter_store.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 
 abstract final class RecommendFilter {
@@ -47,6 +50,21 @@ abstract final class RecommendFilter {
   static bool filterAll(BaseVideoItemModel videoItem) {
     return filterDuration(videoItem.duration) ||
         filterLikeRatio(videoItem.stat.like, videoItem.stat.view) ||
-        filterTitle(videoItem.title);
+        filterTitle(videoItem.title) ||
+        _blockedByRules(videoItem);
+  }
+
+  /// 自定义规则里的「视频」条件；列表项只有 up 主和标题可用来比对。
+  static bool _blockedByRules(BaseVideoItemModel videoItem) {
+    if (!FilterStore.engine.hasActiveRules) return false;
+    final owner = videoItem.owner;
+    return FilterStore.blocked(
+      FilterTarget.video,
+      FilterSubject(
+        uid: owner.mid,
+        nickname: owner.name,
+        content: videoItem.title,
+      ),
+    );
   }
 }

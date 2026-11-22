@@ -17,6 +17,7 @@ import 'package:PiliPlus/pages/fav/view.dart';
 import 'package:PiliPlus/pages/fav_create/view.dart';
 import 'package:PiliPlus/pages/fav_detail/view.dart';
 import 'package:PiliPlus/pages/fav_search/view.dart';
+import 'package:PiliPlus/pages/filter_rules/view.dart';
 import 'package:PiliPlus/pages/follow/view.dart';
 import 'package:PiliPlus/pages/follow_search/view.dart';
 import 'package:PiliPlus/pages/follow_type/follow_same/view.dart';
@@ -111,6 +112,7 @@ class Routes {
     GetPage(name: '/memberSearch', page: () => const MemberSearchPage()),
     //
     GetPage(name: '/blackListPage', page: () => const BlackListPage()),
+    GetPage(name: '/filterRules', page: () => const FilterRulesPage()),
     GetPage(name: '/colorSetting', page: () => const ColorSelectPage()),
     GetPage(name: '/fontSetting', page: () => const FontSettingPage()),
     // 屏幕帧率

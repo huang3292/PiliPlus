@@ -23,6 +23,7 @@ import 'package:PiliPlus/http/reply.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/pages/article/view.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/vote.dart';
+import 'package:PiliPlus/pages/filter_rules/block_uid_dialog.dart';
 import 'package:PiliPlus/pages/member/widget/medal_widget.dart';
 import 'package:PiliPlus/pages/save_panel/view.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -42,6 +43,7 @@ import 'package:PiliPlus/utils/extension/selectable_region_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/filter/filter_rule.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
@@ -1442,6 +1444,24 @@ class ReplyItemGrpc extends StatelessWidget {
             leading: Icon(Icons.error_outline, color: errorColor, size: 19),
             title: Text('举报', style: style.copyWith(color: errorColor)),
           ),
+        ListTile(
+          onTap: () {
+            Get.back();
+            showBlockUserDialog(
+              context,
+              uid: item.mid.toInt(),
+              nickname: item.member.name,
+              presets: {FilterTarget.reply},
+              onBlocked: onDelete,
+            );
+          },
+          minLeadingWidth: 0,
+          leading: Icon(Icons.block_outlined, color: errorColor, size: 19),
+          title: Text(
+            '屏蔽此人',
+            style: TextStyle(fontSize: 14, color: errorColor),
+          ),
+        ),
         if (replyLevel == 1 && !isSubReply && ownerMid == upMid)
           ListTile(
             onTap: () {

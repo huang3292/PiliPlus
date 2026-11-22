@@ -314,6 +314,17 @@ class VideoPopupMenu extends StatelessWidget {
                   ),
                 ],
                 _VideoCustomAction(
+                  '屏蔽：${videoItem.owner.name}',
+                  const Icon(Icons.block_outlined, size: 16),
+                  () => showBlockUserDialog(
+                    context,
+                    uid: videoItem.owner.mid!,
+                    nickname: videoItem.owner.name!,
+                    presets: const {FilterTarget.video},
+                    onBlocked: onRemove,
+                  ),
+                ),
+                _VideoCustomAction(
                   "${MineController.anonymity.value ? '退出' : '进入'}无痕模式",
                   MineController.anonymity.value
                       ? const Icon(MdiIcons.incognitoOff, size: 16)
