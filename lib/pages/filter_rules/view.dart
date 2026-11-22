@@ -31,9 +31,10 @@ class _FilterRulesPageState extends State<FilterRulesPage>
   void initState() {
     super.initState();
     final target = Get.arguments;
+    final initialIndex = target is FilterTarget ? _scopes.indexOf(target) : -1;
     _tabController = TabController(
       length: _scopes.length + 1,
-      initialIndex: target is FilterTarget ? target.index : 0,
+      initialIndex: initialIndex < 0 ? 0 : initialIndex,
       vsync: this,
     );
   }

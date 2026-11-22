@@ -64,9 +64,9 @@ jobs:
           # 进度输出靠 \r 分隔，不换成换行符的话整段会算作一行，注解会被 GitHub 丢掉。
           tr '\r' '\n' < unit_raw.log | sed -e 's/\x1b\[[0-9;]*m//g' > unit.log
           if [ "$status" -ne 0 ]; then
-            grep -aE '\[E\]|Expected:|Actual:|Which:|Error:|Failed to load|Some tests failed' unit.log \
-              | tail -25 | cut -c1-500 | sed -e 's/%/%25/g' \
-              | while IFS= read -r line; do echo "::error::${line}"; done
+            echo "::error::flutter test exit=$status bytes=$(wc -c <unit.log) lines=$(wc -l <unit.log)"
+            tail -25 unit.log | cut -c1-300 | sed -e 's/%/%25/g' \
+              | while IFS= read -r line; do echo "::error::OUT | ${line}"; done
           fi
           exit $status
 
