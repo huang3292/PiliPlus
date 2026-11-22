@@ -1,8 +1,11 @@
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
+import 'package:PiliPlus/common/widgets/dialog/export_import.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/pages/filter_rules/controller.dart';
 import 'package:PiliPlus/pages/filter_rules/rule_editor.dart';
 import 'package:PiliPlus/utils/filter/filter_rule.dart';
+import 'package:PiliPlus/utils/filter/filter_store.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -49,6 +52,20 @@ class _FilterRulesPageState extends State<FilterRulesPage>
     return SimpleScaffold(
       appBar: AppBar(
         title: const Text('自定义屏蔽'),
+        actions: [
+          IconButton(
+            tooltip: '导入/导出规则',
+            icon: const Icon(Icons.import_export),
+            onPressed: () => showImportExportDialog<Map>(
+              context,
+              title: '屏蔽规则',
+              localFileName: () => 'filterRules',
+              onExport: () =>
+                  Utils.jsonEncoder.convert(FilterStore.config.toJson()),
+              onImport: _controller.importConfig,
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
