@@ -8,8 +8,8 @@ import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/watched_show.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/filter/filter_engine.dart';
+import 'package:PiliPlus/utils/filter/filter_judge.dart';
 import 'package:PiliPlus/utils/filter/filter_rule.dart';
-import 'package:PiliPlus/utils/filter/filter_store.dart';
 import 'package:PiliPlus/utils/parse_bool.dart';
 import 'package:PiliPlus/utils/parse_int.dart';
 import 'package:PiliPlus/utils/parse_string.dart';
@@ -50,17 +50,27 @@ class DynamicsDataModel {
 
   static bool antiGoodsDyn = Pref.antiGoodsDyn;
 
-  /// 自定义规则里的「动态」条件：列表数据只有作者和正文可比对。
-  static bool _blockedByRules(DynamicItemModel item) {
-    if (!FilterStore.engine.hasActiveRules) return false;
+  /// 动态列表取得到的依据只有作者与正文（含转发的原文），其余字段留空，
+  /// 规则不能因为接口没给某个字段就判定命中。
+  static FilterDecision _decide(
+    DynamicItemModel item, {
+    required bool legacyHit,
+  }) {
     final author = item.modules.moduleAuthor;
-    return FilterStore.blocked(
-      FilterTarget.dyn,
-      FilterSubject(
+    final orig = item.orig;
+    final vip = author?.vip;
+    return FilterJudge.decide(
+      target: FilterTarget.dyn,
+      subject: FilterSubject(
         uid: author?.mid,
         nickname: author?.name,
-        content: _getMatchText(item),
+        dynText: _getMatchText(item),
+        dynOrigText: orig == null ? null : _getMatchText(orig),
+        officialType: author?.officialVerify?.type,
+        vipType: vip?.type,
+        vipStatus: vip == null ? null : vip.status,
       ),
+      legacyHit: legacyHit,
     );
   }
 
@@ -85,18 +95,15 @@ class DynamicsDataModel {
                     'ADDITIONAL_TYPE_GOODS')) {
           continue;
         }
-        if (enableFilter) {
-          if (item.orig case final orig?) {
-            if (banWordForDyn.hasMatch(_getMatchText(orig))) {
-              continue;
-            }
-          }
-          if (banWordForDyn.hasMatch(_getMatchText(item))) {
-            continue;
-          }
-        }
-        if (_blockedByRules(item)) {
-          continue;
+        final legacyHit = enableFilter &&
+            (banWordForDyn.hasMatch(_getMatchText(item)) ||
+                (item.orig != null &&
+                    banWordForDyn.hasMatch(_getMatchText(item.orig!))));
+        final decision = _decide(item, legacyHit: legacyHit);
+        if (decision.isHidden) {
+          // 动作是「直接移除」才真的丢掉，其余保留下来渲染占位卡。
+          if (decision.shouldRemove) continue;
+          item.hiddenBy = decision;
         }
         if (filterBan &&
             tempBannedList!.contains(item.modules.moduleAuthor?.mid)) {
@@ -126,6 +133,9 @@ class DynamicItemModel {
   bool? visible;
 
   late bool linkFolded = false;
+
+  /// 命中隐藏规则时的结论，为空表示正常显示；条目照常留在列表里。
+  FilterDecision? hiddenBy;
 
   // opus
   Fallback? fallback;

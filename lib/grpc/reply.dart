@@ -5,9 +5,9 @@ import 'package:PiliPlus/grpc/grpc_req.dart';
 import 'package:PiliPlus/grpc/url.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/utils/filter/filter_engine.dart';
+import 'package:PiliPlus/utils/filter/filter_judge.dart';
+import 'package:PiliPlus/utils/filter/filter_marks.dart';
 import 'package:PiliPlus/utils/filter/filter_rule.dart';
-import 'package:PiliPlus/utils/filter/filter_store.dart';
-import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -99,30 +99,37 @@ abstract final class ReplyGrpc {
         reply.content.atNameToMid.length >= blockReplyAtCount!;
   }
 
-  /// 用户自定义规则：等级/昵称/uid 等已在响应里，粉丝数缺失时不屏蔽。
-  static bool _blockedByRules(ReplyInfo reply) {
-    if (!FilterStore.engine.hasActiveRules) return false;
-    final member = reply.member;
-    return FilterStore.blocked(
-      FilterTarget.reply,
-      FilterSubject(
-        uid: reply.mid.toInt(),
-        nickname: member.name,
-        content: reply.content.message,
-        level: member.level.toInt(),
-        officialType: member.officialVerifyType.toInt(),
-        isVip: member.vipType > 0,
-      ),
-    );
-  }
-
-  static bool needRemoveGrpc(ReplyInfo reply) {
-    return GlobalData().blackMids.contains(reply.mid.toInt()) ||
-        _blockReplyAtCount(reply) ||
+  /// 命中隐藏时不删条目：结论按 rpid 记进 [FilterMarks]，评论 item 自己渲染
+  /// 成折叠条。返回 true 表示这条真的不进列表——用户把动作设成了「直接移除」，
+  /// 或者属于带货、@ 刷屏这类质量过滤（那些不是隐藏功能，不该占位）。
+  static bool hideOrRemove(ReplyInfo reply) {
+    if (_blockReplyAtCount(reply) ||
         _blockAtOnlyReply(reply) ||
-        (antiGoodsReply && _needRemoveGoodGrpc(reply)) ||
-        (enableFilter && replyRegExp.hasMatch(reply.content.message)) ||
-        _blockedByRules(reply);
+        (antiGoodsReply && _needRemoveGoodGrpc(reply))) {
+      return true;
+    }
+    final member = reply.member;
+    final mid = reply.mid.toInt();
+    final message = reply.content.message;
+    final decision = FilterJudge.decide(
+      target: FilterTarget.reply,
+      subject: FilterSubject(
+        uid: mid > 0 ? mid : null,
+        nickname: member.name,
+        replyContent: message,
+        level: member.hasLevel() ? member.level.toInt() : null,
+        officialType: member.hasOfficialVerifyType()
+            ? member.officialVerifyType.toInt()
+            : null,
+        vipType: member.hasVipType() ? member.vipType.toInt() : null,
+        vipStatus: member.hasVipStatus() ? member.vipStatus.toInt() : null,
+      ),
+      legacyHit: enableFilter && replyRegExp.hasMatch(message),
+    );
+    if (!decision.isHidden) return false;
+    if (decision.shouldRemove) return true;
+    FilterMarks.put(FilterTarget.reply, reply.id.toString(), decision);
+    return false;
   }
 
   static Future<LoadingState<MainListReply>> mainList({
@@ -152,20 +159,20 @@ abstract final class ReplyGrpc {
       // keyword filter
       if (response.hasUpTop()) {
         final topReply = response.upTop;
-        if (needRemoveGrpc(topReply)) {
+        if (hideOrRemove(topReply)) {
           response.clearUpTop();
         } else {
-          topReply.replies.removeWhere(needRemoveGrpc);
+          topReply.replies.removeWhere(hideOrRemove);
         }
       }
 
       if (response.replies.isNotEmpty) {
         response.replies.removeWhere((item) {
-          final hasMatch = needRemoveGrpc(item);
-          if (!hasMatch && item.replies.isNotEmpty) {
-            item.replies.removeWhere(needRemoveGrpc);
+          final dropped = hideOrRemove(item);
+          if (item.replies.isNotEmpty) {
+            item.replies.removeWhere(hideOrRemove);
           }
-          return hasMatch;
+          return dropped;
         });
       }
 
@@ -210,9 +217,9 @@ abstract final class ReplyGrpc {
     return res
       ..dataOrNull?.root.replies.removeWhere(
         removed == null
-            ? needRemoveGrpc
+            ? hideOrRemove
             : (i) {
-                final flag = needRemoveGrpc(i);
+                final flag = hideOrRemove(i);
                 if (flag) removed[i.id] = i;
                 return flag;
               },
@@ -233,7 +240,7 @@ abstract final class ReplyGrpc {
       ),
       FoldListResp.fromBuffer,
     );
-    return res..dataOrNull?.replies.removeWhere(needRemoveGrpc);
+    return res..dataOrNull?.replies.removeWhere(hideOrRemove);
   }
 
   static Future<LoadingState<DialogListReply>> dialogList({
@@ -254,7 +261,7 @@ abstract final class ReplyGrpc {
       ),
       DialogListReply.fromBuffer,
     );
-    return res..dataOrNull?.replies.removeWhere(needRemoveGrpc);
+    return res..dataOrNull?.replies.removeWhere(hideOrRemove);
   }
 
   static Future<LoadingState<SearchItemReply>> searchItem({

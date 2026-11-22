@@ -13,6 +13,7 @@ import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/pages/dynamics/controller.dart';
+import 'package:PiliPlus/pages/filter_rules/block_uid_dialog.dart';
 import 'package:PiliPlus/pages/save_panel/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
@@ -21,6 +22,7 @@ import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/filter/filter_rule.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
@@ -371,6 +373,24 @@ class AuthorPanel extends StatelessWidget {
                   },
                   minLeadingWidth: 0,
                 ),
+              ListTile(
+                title: Text(
+                  '隐藏：${moduleAuthor.name}',
+                  style: theme.textTheme.titleSmall,
+                ),
+                leading: const Icon(Icons.block_outlined, size: 19),
+                onTap: () {
+                  Get.back();
+                  showBlockUserDialog(
+                    context,
+                    uid: moduleAuthor.mid!,
+                    nickname: moduleAuthor.name,
+                    presets: const {FilterTarget.dyn},
+                    onBlocked: onBlock,
+                  );
+                },
+                minLeadingWidth: 0,
+              ),
               ListTile(
                 title: Text(
                   '临时屏蔽：${moduleAuthor.name}',

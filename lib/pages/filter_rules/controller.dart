@@ -11,57 +11,62 @@ const List<FilterTarget> kFilterScopes = [
   FilterTarget.dyn,
 ];
 
+/// 只是 [FilterStore] 的一份可观察快照：真正写数据的一律走 FilterStore，
+/// 所以从评论长按里加的规则也能立刻出现在这里。
 class FilterRulesController extends GetxController {
   final rules = <FilterRule>[].obs;
   final exempts = <FilterExempt>[].obs;
-
-  List<FilterRule> rulesFor(FilterTarget target) =>
-      rules.where((rule) => rule.targets.contains(target)).toList(growable: false);
+  final display = <FilterTarget, FilterAction>{}.obs;
+  final notes = <String>[].obs;
 
   @override
   void onInit() {
     super.onInit();
-    rules.value = FilterStore.config.rules;
-    exempts.value = FilterStore.config.exempts;
+    FilterStore.revision.addListener(_sync);
+    _sync();
   }
 
-  int nextId() {
-    var max = 0;
-    for (final rule in rules) {
-      if (rule.id > max) max = rule.id;
-    }
-    for (final exempt in exempts) {
-      if (exempt.id > max) max = exempt.id;
-    }
-    return max + 1;
+  @override
+  void onClose() {
+    FilterStore.revision.removeListener(_sync);
+    super.onClose();
   }
 
-  Future<void> upsert(FilterRule rule) async {
-    final index = rules.indexWhere((item) => item.id == rule.id);
-    if (index < 0) {
-      rules.add(rule);
-    } else {
-      rules[index] = rule;
-    }
-    await _save();
+  void _sync() {
+    final config = FilterStore.config;
+    rules.value = config.rules;
+    exempts.value = config.exempts;
+    display.value = config.display;
+    notes.value = config.warnings;
   }
+
+  List<FilterRule> rulesFor(FilterTarget target) =>
+      rules.where((rule) => rule.targets.contains(target)).toList(growable: false);
+
+  FilterAction actionFor(FilterTarget target) =>
+      display[target] ?? target.defaultAction;
+
+  int nextId() => FilterStore.nextId();
+
+  Future<void> upsert(FilterRule rule) => FilterStore.upsert(rule);
 
   Future<void> remove(FilterRule rule) async {
-    rules.remove(rule);
-    await _save();
+    await FilterStore.remove(rule);
     SmartDialog.showToast('已删除');
   }
 
-  Future<void> toggle(FilterRule rule, bool enabled) async {
-    final index = rules.indexWhere((item) => item.id == rule.id);
-    if (index < 0) return;
-    rules[index] = _copy(rule, enabled: enabled);
-    await _save();
-  }
+  Future<void> toggle(FilterRule rule, bool enabled) =>
+      FilterStore.toggle(rule, enabled);
 
-  Future<void> removeExempt(FilterExempt exempt) async {
-    exempts.remove(exempt);
-    await _save();
+  Future<void> setAction(FilterTarget target, FilterAction? action) =>
+      FilterStore.setAction(target, action);
+
+  Future<void> removeExempt(FilterExempt exempt) =>
+      FilterStore.removeExempt(exempt.uid);
+
+  Future<void> exemptUid(int uid, {String name = ''}) async {
+    await FilterStore.exemptUid(uid, name: name);
+    SmartDialog.showToast('已加入例外名单');
   }
 
   /// 导入 JSON 文件：同一条规则不重复添加，换账号登录时可以直接合并。
@@ -72,6 +77,8 @@ class FilterRulesController extends GetxController {
     }
     final merged = [...rules];
     final known = merged.map(_signature).toSet();
+    final ruleCount = rules.length;
+    final exemptCount = exempts.length;
     var id = nextId();
     for (final rule in incoming.rules) {
       if (known.add(_signature(rule))) {
@@ -80,64 +87,48 @@ class FilterRulesController extends GetxController {
             id: id++,
             enabled: rule.enabled,
             targets: rule.targets,
-            field: rule.field,
-            match: rule.match,
-            value: rule.value,
-            caseSensitive: rule.caseSensitive,
-            exceptValue: rule.exceptValue,
+            conditions: rule.conditions,
+            action: rule.action,
+            source: FilterSource.manual,
           ),
         );
       }
     }
     final mergedExempts = [...exempts];
-    final knownExempts = mergedExempts.map((e) => '${e.field.name}${e.value}').toSet();
+    final knownUids = mergedExempts.map((e) => e.uid).toSet();
     for (final exempt in incoming.exempts) {
-      final key = '${exempt.field.name}${exempt.value}';
-      if (knownExempts.add(key)) {
+      if (knownUids.add(exempt.uid)) {
         mergedExempts.add(
-          FilterExempt(id: id++, field: exempt.field, value: exempt.value),
+          FilterExempt(id: id++, uid: exempt.uid, name: exempt.name),
         );
       }
     }
+    final display = {...FilterStore.config.display};
+    incoming.display.forEach((target, action) => display[target] ??= action);
+
+    final importedRules = merged.length - ruleCount;
+    final importedExempts = mergedExempts.length - exemptCount;
     await FilterStore.save(
-      FilterConfig(rules: merged, exempts: mergedExempts),
+      FilterConfig(
+        rules: merged,
+        exempts: mergedExempts,
+        display: display,
+        warnings: [
+          ...FilterStore.config.warnings,
+          ...incoming.warnings,
+          if (incoming.display.isNotEmpty) '导入文件里的显示方式只补了没设置过的范围',
+        ],
+      ),
     );
-    reload();
+    SmartDialog.showToast('新增了 $importedRules 条规则、$importedExempts 条例外');
   }
 
-  static String _signature(FilterRule rule) =>
-      '${rule.field.name}|${rule.match.name}|${rule.value}|'
-      '${(rule.targets.toList()..sort((a, b) => a.index - b.index)).map((e) => e.index).join()}';
-
-  void reload() {
-    rules.value = FilterStore.config.rules;
-    exempts.value = FilterStore.config.exempts;
-  }
-
-  Future<void> exemptUid(int uid, String nickname) async {
-    await FilterStore.exemptUid(uid, nickname);
-    reload();
-    SmartDialog.showToast('已加入例外名单');
-  }
-
-  Future<void> _save() async {
-    await FilterStore.save(FilterConfig(rules: rules, exempts: exempts));
-  }
-
-  static FilterRule _copy(
-    FilterRule rule, {
-    bool? enabled,
-    Set<FilterTarget>? targets,
-  }) {
-    return FilterRule(
-      id: rule.id,
-      enabled: enabled ?? rule.enabled,
-      targets: targets ?? rule.targets,
-      field: rule.field,
-      match: rule.match,
-      value: rule.value,
-      caseSensitive: rule.caseSensitive,
-      exceptValue: rule.exceptValue,
-    );
-  }
+  static String _signature(FilterRule rule) => [
+    for (final target in rule.targets.toList()..sort((a, b) => a.index - b.index))
+      target.name,
+    for (final condition in rule.conditions)
+      '${condition.field.name}/${condition.op.name}/'
+          '${condition.values.join()}/${condition.caseSensitive}',
+    rule.action?.name ?? '',
+  ].join('|');
 }

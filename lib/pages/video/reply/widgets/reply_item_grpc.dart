@@ -43,6 +43,8 @@ import 'package:PiliPlus/utils/extension/selectable_region_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/filter/filter_engine.dart';
+import 'package:PiliPlus/utils/filter/filter_marks.dart';
 import 'package:PiliPlus/utils/filter/filter_rule.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
@@ -467,10 +469,22 @@ class ReplyItemGrpc extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme.of(context);
-
-    return reason != null
-        ? _buildPlaceholder(context, colorScheme)
-        : _buildCommon(context, colorScheme);
+    if (reason != null) {
+      return _buildPlaceholder(context, colorScheme);
+    }
+    final hiddenBy = FilterMarks.of(
+      FilterTarget.reply,
+      replyItem.id.toString(),
+    );
+    if (hiddenBy == null) {
+      return _buildCommon(context, colorScheme);
+    }
+    return _HiddenReply(
+      decision: hiddenBy,
+      depth: depth,
+      needDivider: needDivider,
+      content: () => _buildCommon(context, colorScheme),
+    );
   }
 
   Widget _buildPlaceholder(BuildContext context, ColorScheme colorScheme) {
@@ -1458,7 +1472,7 @@ class ReplyItemGrpc extends StatelessWidget {
           minLeadingWidth: 0,
           leading: Icon(Icons.block_outlined, color: errorColor, size: 19),
           title: Text(
-            '屏蔽此人',
+            '隐藏此人',
             style: TextStyle(fontSize: 14, color: errorColor),
           ),
         ),
@@ -1523,6 +1537,66 @@ class ReplyItemGrpc extends StatelessWidget {
             title: Text('检查评论', style: style),
           ),
       ],
+    );
+  }
+}
+
+/// 被本地隐藏规则命中的评论：折叠成一行，点开只看这一条，不影响规则本身。
+/// 主楼被折叠时楼中楼跟着看不到（本来就在主楼卡片里），想单独看楼中楼可以
+/// 进这条评论的详情页。
+class _HiddenReply extends StatefulWidget {
+  final FilterDecision decision;
+  final int depth;
+  final bool needDivider;
+  final Widget Function() content;
+
+  const _HiddenReply({
+    required this.decision,
+    required this.depth,
+    required this.needDivider,
+    required this.content,
+  });
+
+  @override
+  State<_HiddenReply> createState() => _HiddenReplyState();
+}
+
+class _HiddenReplyState extends State<_HiddenReply> {
+  bool _revealed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_revealed) return widget.content();
+    final colorScheme = ColorScheme.of(context);
+    final decision = widget.decision;
+    final source = decision.rule?.source ?? decision.source;
+    return _replyItemLayout(
+      context: context,
+      depth: widget.depth,
+      needDivider: widget.needDivider,
+      onTap: () => setState(() => _revealed = true),
+      content: Row(
+        children: [
+          Icon(
+            Icons.visibility_off_outlined,
+            size: 17,
+            color: colorScheme.outline,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '已隐藏的评论（${source?.label ?? '命中隐藏规则'}）',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, color: colorScheme.outline),
+            ),
+          ),
+          Text(
+            '展开',
+            style: TextStyle(fontSize: 13, color: colorScheme.primary),
+          ),
+        ],
+      ),
     );
   }
 }

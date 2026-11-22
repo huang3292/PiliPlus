@@ -138,6 +138,7 @@ abstract final class SettingBoxKey {
       banWordForDyn = 'banWordForDyn',
       filterRules = 'filterRules',
       filterRulesMigrated = 'filterRulesMigrated',
+      filterRulesBackup = 'filterRulesBackup',
       enableLog = 'enableLog',
       memberTab = 'memberTab',
       dynamicDetailRatio = 'dynamicDetailRatio',

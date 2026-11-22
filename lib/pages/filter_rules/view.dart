@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/dialog/export_import.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/pages/filter_rules/controller.dart';
 import 'package:PiliPlus/pages/filter_rules/rule_editor.dart';
+import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/utils/filter/filter_rule.dart';
 import 'package:PiliPlus/utils/filter/filter_store.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -11,8 +12,8 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 自定义屏蔽规则：一条规则就是一个下拉能选出来的条件，
-/// 最后一个标签页放例外名单，用来救被误伤的人。
+/// 本地隐藏规则：一条规则 = 若干「且」关系的条件，命中后按范围设置显示成
+/// 占位卡片、折叠条或直接移除；最后一个标签页放例外名单，用来救被误伤的人。
 class FilterRulesPage extends StatefulWidget {
   const FilterRulesPage({super.key});
 
@@ -52,14 +53,14 @@ class _FilterRulesPageState extends State<FilterRulesPage>
     final theme = Theme.of(context);
     return SimpleScaffold(
       appBar: AppBar(
-        title: const Text('自定义屏蔽'),
+        title: const Text('本地隐藏'),
         actions: [
           IconButton(
             tooltip: '导入/导出规则',
             icon: const Icon(Icons.import_export),
             onPressed: () => showImportExportDialog<Map>(
               context,
-              title: '屏蔽规则',
+              title: '隐藏规则',
               localFileName: () => 'filterRules',
               onExport: () =>
                   Utils.jsonEncoder.convert(FilterStore.config.toJson()),
@@ -95,48 +96,108 @@ class _FilterRulesPageState extends State<FilterRulesPage>
 
   Widget _ruleList(FilterTarget target, ThemeData theme) {
     final rules = _controller.rulesFor(target);
-    if (rules.isEmpty) {
-      return _empty('还没有规则，点右下角加一条', theme);
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 96),
-      itemCount: rules.length,
-      itemBuilder: (context, index) {
-        final rule = rules[index];
-        return ListTile(
-          title: Text(rule.summary, style: theme.textTheme.bodyMedium),
-          subtitle: Text(_scopeText(rule, target)),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Switch(
-                value: rule.enabled,
-                onChanged: (value) => _controller.toggle(rule, value),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () => _edit(rule),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => showConfirmDialog(
-                  context: context,
-                  title: const Text('确定删除该规则？'),
-                  onConfirm: () => _controller.remove(rule),
+    return Column(
+      children: [
+        _notes(theme),
+        _displayRow(target, theme),
+        Expanded(
+          child: rules.isEmpty
+              ? _empty('还没有规则，点右下角加一条', theme)
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 96),
+                  itemCount: rules.length,
+                  itemBuilder: (context, index) {
+                    final rule = rules[index];
+                    return ListTile(
+                      title: Text(rule.summary, style: theme.textTheme.bodyMedium),
+                      subtitle: Text(_scopeText(rule, target)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: rule.enabled,
+                            onChanged: (value) => _controller.toggle(rule, value),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () => _edit(rule),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => showConfirmDialog(
+                              context: context,
+                              title: const Text('确定删除该规则？'),
+                              onConfirm: () => _controller.remove(rule),
+                            ),
+                          ),
+                        ],
+                      ),
+                      onTap: () => _edit(rule),
+                    );
+                  },
                 ),
-              ),
+        ),
+      ],
+    );
+  }
+
+  /// 每个范围各自的默认显示方式。
+  Widget _displayRow(FilterTarget target, ThemeData theme) {
+    final action = _controller.actionFor(target);
+    return ListTile(
+      dense: true,
+      title: Text('命中后怎么显示', style: theme.textTheme.bodyMedium),
+      subtitle: Text(
+        '${target.label}：${action.label}',
+        style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+      ),
+      trailing: const Icon(Icons.unfold_more, size: 20),
+      onTap: () async {
+        final picked = await showDialog<FilterAction>(
+          context: context,
+          builder: (context) => SelectDialog<FilterAction>(
+            title: '${target.label}命中之后',
+            value: action,
+            values: [
+              for (final item in FilterAction.values) (item, item.label),
             ],
           ),
-          onTap: () => _edit(rule),
         );
+        if (picked == null) return;
+        _controller.setAction(target, picked);
+        SmartDialog.showToast('已改为${picked.label}');
       },
+    );
+  }
+
+  Widget _notes(ThemeData theme) {
+    final notes = _controller.notes;
+    if (notes.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: theme.colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final note in notes)
+              Text(
+                note,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _exemptList(ThemeData theme) {
     final exempts = _controller.exempts;
     if (exempts.isEmpty) {
-      return _empty('例外名单里的人永远不会被屏蔽，用来救误伤', theme);
+      return _empty('例外名单里的人永远不会被隐藏，用来救误伤', theme);
     }
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 96),
@@ -145,9 +206,10 @@ class _FilterRulesPageState extends State<FilterRulesPage>
         final exempt = exempts[index];
         return ListTile(
           title: Text(
-            '${exempt.field.label} ${exempt.value}',
+            exempt.name.isEmpty ? 'UID ${exempt.uid}' : exempt.name,
             style: theme.textTheme.bodyMedium,
           ),
+          subtitle: Text('UID ${exempt.uid}'),
           trailing: IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () => showConfirmDialog(
@@ -175,19 +237,22 @@ class _FilterRulesPageState extends State<FilterRulesPage>
         .map((target) => target.label)
         .join('、');
     final scopes = [current.label, if (others.isNotEmpty) others].join('、');
-    return '范围：$scopes${rule.enabled ? '' : '（已停用）'}';
+    return '范围：$scopes'
+        ' · ${rule.actionLabel}'
+        '${rule.enabled ? '' : '（已停用）'}';
   }
 
   void _add() {
     final target = _scopes[_tabController.index];
+    final field = target.fields.first;
     showRuleEditorDialog(
       context,
       rule: FilterRule(
         id: _controller.nextId(),
         targets: {target},
-        field: FilterField.content,
-        match: FilterMatch.contains,
-        value: '',
+        conditions: [
+          FilterCondition(field: field, op: allowedOps(field).first, values: const ['']),
+        ],
       ),
       onSave: (rule) {
         _controller.upsert(rule);
@@ -218,11 +283,11 @@ class _FilterRulesPageState extends State<FilterRulesPage>
       ),
       onConfirm: () {
         final uid = int.tryParse(text);
-        if (uid == null) {
+        if (uid == null || uid <= 0) {
           SmartDialog.showToast('请输入 UID');
           return;
         }
-        _controller.exemptUid(uid, '');
+        _controller.exemptUid(uid);
       },
     );
   }

@@ -19,8 +19,8 @@ List<SettingsModel> get privacySettings => [
   ),
   NormalModel(
     onTap: (context, setState) => Get.toNamed('/filterRules'),
-    title: '自定义屏蔽',
-    subtitle: '按等级、UID、昵称等条件屏蔽评论/视频/动态',
+    title: '本地隐藏',
+    subtitle: '按等级、UID、昵称等条件隐藏评论/视频/动态',
     leading: const Icon(Icons.block_outlined),
   ),
   const NormalModel(

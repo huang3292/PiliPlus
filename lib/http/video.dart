@@ -30,7 +30,6 @@ import 'package:PiliPlus/models_new/video/video_shot/data.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
-import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
@@ -45,9 +44,6 @@ import 'package:protobuf/protobuf.dart';
 
 /// view层根据 status 判断渲染逻辑
 abstract final class VideoHttp {
-  static RegExp zoneRegExp = RegExp(Pref.banWordForZone, caseSensitive: false);
-  static bool enableFilter = zoneRegExp.pattern.isNotEmpty;
-
   // 首页推荐视频
   //
   // [desktop] 为 true 时沿用同一个公开网页接口，改用哔哩哔哩官方 Windows
@@ -92,12 +88,14 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       List<RcmdVideoItemModel> list = <RcmdVideoItemModel>[];
       for (final i in res.data['data']['item']) {
-        //过滤掉live与ad，以及拉黑用户
-        if (_filterWebRcmd(i)) continue;
+        // 只丢直播、番剧外的杂项；拉黑用户和旧关键词都交给统一判定，
+        // 命中隐藏的条目照常保留，由卡片渲染成占位卡。
+        if (i['goto'] != 'av') continue;
         final videoItem = RcmdVideoItemModel.fromJson(i);
-        if (!RecommendFilter.filterWithExempt(videoItem)) {
-          list.add(videoItem);
-        }
+        final decision = RecommendFilter.filter(videoItem);
+        if (decision == null) continue;
+        videoItem.hiddenBy = decision.isHidden ? decision : null;
+        list.add(videoItem);
       }
       return Success(list);
     } else {
@@ -105,29 +103,13 @@ abstract final class VideoHttp {
     }
   }
 
-  static bool _filterWebRcmd(dynamic i) {
-    if (i['goto'] != 'av') return true;
-    if (i['owner'] != null &&
-        GlobalData().blackMids.contains(i['owner']['mid'])) {
-      return true;
-    }
-    return false;
-  }
-
-  static bool _filterAppRcmd(dynamic i) {
+  /// App 推荐里的推广和不可播放条目是真的不进列表，其余判定都在
+  /// [RecommendFilter.filter] 里做（这里拿不到分区名以外的可用字段）。
+  static bool _isAdOrUnplayable(dynamic i) {
     if (i['card_goto'] == 'ad_av' ||
         i['card_goto'] == 'ad_web_s' ||
         i['ad_info'] != null ||
         i['can_play'] != 1) {
-      return true;
-    }
-    if (i['args'] != null &&
-        GlobalData().blackMids.contains(i['args']['up_id'])) {
-      return true;
-    }
-    if (enableFilter &&
-        i['args']?['tname'] != null &&
-        zoneRegExp.hasMatch(i['args']['tname'])) {
       return true;
     }
     return false;
@@ -188,12 +170,17 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       final list = <RcmdVideoItemAppModel>[];
       for (final i in res.data['data']['items']) {
-        // 屏蔽推广和拉黑用户
-        if (_filterAppRcmd(i)) continue;
+        // 推广和不可播放的直接不要，其余命中隐藏的保留成占位卡
+        if (_isAdOrUnplayable(i)) continue;
         final videoItem = RcmdVideoItemAppModel.fromJson(i);
-        if (!RecommendFilter.filterWithExempt(videoItem)) {
-          list.add(videoItem);
-        }
+        final zone = i['args']?['tname'];
+        final decision = RecommendFilter.filter(
+          videoItem,
+          zone: zone is String ? zone : null,
+        );
+        if (decision == null) continue;
+        videoItem.hiddenBy = decision.isHidden ? decision : null;
+        list.add(videoItem);
       }
       return Success(list);
     } else {
@@ -201,17 +188,18 @@ abstract final class VideoHttp {
     }
   }
 
-  static bool _filterHotAndRank(dynamic i) {
-    if (GlobalData().blackMids.contains(i['owner']['mid'])) return false;
-    if (RecommendFilter.filterTitle(i['title'])) return false;
-    if (RecommendFilter.blockedFromJson(i)) return false;
-    if (RecommendFilter.filterLikeRatio(i['stat']['like'], i['stat']['view'])) {
-      return false;
-    }
-    if (enableFilter && i['tname'] != null && zoneRegExp.hasMatch(i['tname'])) {
-      return false;
-    }
-    return true;
+  /// 热门/排行的条目：命中质量阈值的不进列表，命中隐藏规则的保留下来打标记。
+  /// 时长阈值老代码就没用在热门/排行上，继续保持不用。
+  static HotVideoItemModel? _hotWithMark(dynamic i) {
+    final item = HotVideoItemModel.fromJson(i);
+    final decision = RecommendFilter.filter(
+      item,
+      zone: item.tname,
+      checkDuration: false,
+    );
+    if (decision == null) return null;
+    item.hiddenBy = decision.isHidden ? decision : null;
+    return item;
   }
 
   // 最热视频
@@ -226,8 +214,8 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       return Success(
         (res.data['data']['list'] as List)
-            .where(_filterHotAndRank)
-            .map((e) => HotVideoItemModel.fromJson(e))
+            .map(_hotWithMark)
+            .whereType<HotVideoItemModel>()
             .toList(),
       );
     } else {
@@ -411,12 +399,20 @@ abstract final class VideoHttp {
     );
     if (res.data['code'] == 0) {
       final items = (res.data['data'] as List?)
-          ?.whereNotBlocked((e) => e['owner']?['mid'])
-          .map((i) => HotVideoItemModel.fromJson(i));
-      final list = RecommendFilter.applyFilterToRelatedVideos
-          ? items?.where((i) => !RecommendFilter.filterAll(i)).toList()
-          : items?.toList();
-      return Success(list);
+          ?.map((i) {
+            final item = HotVideoItemModel.fromJson(i);
+            if (!RecommendFilter.applyFilterToRelatedVideos) return item;
+            final decision = RecommendFilter.filter(
+              item,
+              zone: item.tname,
+            );
+            if (decision == null) return null;
+            item.hiddenBy = decision.isHidden ? decision : null;
+            return item;
+          })
+          .whereType<HotVideoItemModel>()
+          .toList();
+      return Success(items);
     } else {
       return Error(res.data['message']);
     }
@@ -955,8 +951,8 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       return Success(
         (res.data['data']['list'] as List)
-            .where(_filterHotAndRank)
-            .map((e) => HotVideoItemModel.fromJson(e))
+            .map(_hotWithMark)
+            .whereType<HotVideoItemModel>()
             .toList(),
       );
     } else {

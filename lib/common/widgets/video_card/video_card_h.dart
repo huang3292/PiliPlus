@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
+import 'package:PiliPlus/common/widgets/hidden_overlay.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/progress_bar/video_progress_indicator.dart';
@@ -36,6 +37,16 @@ class VideoCardH extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hiddenBy = videoItem.hiddenBy;
+    if (hiddenBy == null) return card(context);
+    return HiddenOverlay(
+      label: '已隐藏视频',
+      decision: hiddenBy,
+      child: card(context),
+    );
+  }
+
+  Widget card(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
       type: .transparency,

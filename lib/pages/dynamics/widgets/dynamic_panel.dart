@@ -1,4 +1,5 @@
 import 'package:PiliPlus/common/widgets/avatars.dart';
+import 'package:PiliPlus/common/widgets/hidden_overlay.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
@@ -60,7 +61,7 @@ class DynamicPanel extends StatelessWidget {
 
     void showMore() => _imageSaveDialog(context, authorWidget.morePanel);
 
-    final child = Material(
+    var child = Material(
       type: MaterialType.transparency,
       child: InkWell(
         onTap:
@@ -121,6 +122,13 @@ class DynamicPanel extends StatelessWidget {
         ),
       ),
     );
+    if (item.hiddenBy case final hiddenBy?) {
+      child = HiddenOverlay(
+        label: '已隐藏动态',
+        decision: hiddenBy,
+        child: child,
+      );
+    }
     if (isSave || (isDetail && !isDetailPortraitW)) {
       return child;
     }

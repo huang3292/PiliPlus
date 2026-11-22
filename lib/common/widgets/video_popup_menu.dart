@@ -316,7 +316,7 @@ class VideoPopupMenu extends StatelessWidget {
                   ),
                 ],
                 _VideoCustomAction(
-                  '屏蔽：${videoItem.owner.name}',
+                  '隐藏：${videoItem.owner.name}',
                   const Icon(Icons.block_outlined, size: 16),
                   () => showBlockUserDialog(
                     context,
