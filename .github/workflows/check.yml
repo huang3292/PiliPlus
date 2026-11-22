@@ -72,12 +72,11 @@ jobs:
           # 进度输出靠 \r 分隔，不换成换行符的话整段会算作一行，注解会被 GitHub 丢掉。
           tr '\r' '\n' < unit_raw.log | sed -e 's/\x1b\[[0-9;]*m//g' > unit.log
           if [ "$status" -ne 0 ]; then
-            echo "::error::flutter test exit=$status bytes=$(wc -c <unit.log) lines=$(wc -l <unit.log)"
-            grep -aB14 -m1 'Expected:' unit.log | cut -c1-300 | sed -e 's/%/%25/g' \
-              | while IFS= read -r line; do echo "::error::FAIL | ${line}"; done
-            echo "::error::SUM | $(grep -acE '✅' unit.log) passed / $(grep -acE '❌|Unhandled' unit.log) bad / last: $(grep -aE '✅|❌' unit.log | tail -1 | cut -c1-160)"
-            tail -25 unit.log | cut -c1-300 | sed -e 's/%/%25/g' \
-              | while IFS= read -r line; do echo "::error::OUT | ${line}"; done
+            # 每个步骤只保留 10 条注解，逐行 echo 会被截断，所以把多行塞进一条（%0A 是换行转义）。
+            pack() { sed -e 's/%/%25/g' | cut -c1-200 | awk '{printf "%s%%0A", $0}'; }
+            echo "::error::flutter test exit=$status lines=$(wc -l <unit.log)"
+            echo "::error::MARKS | $(grep -av '✅' unit.log | grep -aE '^[0-9]{2}:[0-9]{2}|Some tests|All tests' | head -12 | pack)"
+            echo "::error::AROUND | $(grep -aB6 -m1 'Expected:' unit.log | pack)"
           fi
           exit $status
 

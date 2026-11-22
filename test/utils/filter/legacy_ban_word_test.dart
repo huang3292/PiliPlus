@@ -148,7 +148,9 @@ void main() {
         (FilterTarget.video, '分区词'),
       ]);
       expect(rules.map((e) => e.value), ['推荐词', '分区词']);
-      expect(rules.every((e) => e.targets == {FilterTarget.video}), isTrue);
+      for (final item in rules) {
+        expect(item.targets, {FilterTarget.video});
+      }
     });
   });
 }
